@@ -1,0 +1,131 @@
+openapi: 3.0.0
+info:
+  title: Employee API
+  version: 1.0.0
+  description: API for managing employees
+servers:
+  - url: http://localhost/database_flora/api
+    description: Local development server
+paths:
+  /employee.php:
+    get:
+      summary: Get all employees or a specific employee by ID
+      parameters:
+        - name: id
+          in: query
+          description: The ID of the employee to retrieve
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Employee'
+        '400':
+          description: Bad Request
+    post:
+      summary: Add a new employee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - first_name
+                - last_name
+                - email
+                - gender
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                email:
+                  type: string
+                gender:
+                  type: string
+      responses:
+        '201':
+          description: Employee added successfully
+        '400':
+          description: Missing required fields
+        '500':
+          description: Failed to add employee
+    put:
+      summary: Update an existing employee
+      parameters:
+        - name: id
+          in: query
+          description: The ID of the employee to update
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                email:
+                  type: string
+                gender:
+                  type: string
+                salary:
+                  type: number
+                position:
+                  type: string
+                size:
+                  type: string
+      responses:
+        '200':
+          description: Employee updated successfully
+        '400':
+          description: Invalid employee ID
+        '500':
+          description: Failed to update employee
+    delete:
+      summary: Delete an employee
+      parameters:
+        - name: id
+          in: query
+          description: The ID of the employee to delete
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Employee deleted successfully
+        '400':
+          description: Invalid employee ID
+        '500':
+          description: Failed to delete employee
+components:
+  schemas:
+    Employee:
+      type: object
+      properties:
+        id:
+          type: integer
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+        gender:
+          type: string
+        salary:
+          type: number
+        position:
+          type: string
+        size:
+          type: string

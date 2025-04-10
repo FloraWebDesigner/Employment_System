@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>API Documentation</title>
+  <!-- Load CSS from CDN -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui.min.css" rel="stylesheet">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+
+  <!-- Load JS from CDN with fallback -->
+  <script>
+    function loadSwagger() {
+      // Try CDN first
+      const cdnSuccess = loadScript(
+        'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-bundle.min.js',
+        () => loadScript(
+          'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-standalone-preset.min.js',
+          initSwagger
+        )
+      );
+      
+      if (!cdnSuccess) {
+        // Fallback to local files
+        loadScript('./swagger-ui-bundle.js', 
+          () => loadScript('./swagger-ui-standalone-preset.js', initSwagger)
+        );
+      }
+    }
+
+    function loadScript(src, onSuccess) {
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = onSuccess;
+      script.onerror = () => false;
+      document.head.appendChild(script);
+      return true;
+    }
+
+    function initSwagger() {
+      try {
+        if (!window.SwaggerUIBundle) throw new Error('Libraries not loaded');
+        
+        window.ui = SwaggerUIBundle({
+          url: './swagger.yaml',
+          dom_id: '#swagger-ui',
+          presets: [
+            SwaggerUIBundle.presets.apis,
+            SwaggerUIStandalonePreset
+          ],
+          layout: "StandaloneLayout",
+          deepLinking: true
+        });
+      } catch (e) {
+        document.getElementById('swagger-ui').innerHTML = `
+          <div style="padding:20px;color:red;font-family:Arial">
+            <h2>Documentation Failed to Load</h2>
+            <p>${e.message}</p>
+            <h3>Complete Solution:</h3>
+            <ol>
+              <li>Verify XAMPP Apache is running</li>
+              <li>Check <a href="./swagger.yaml" target="_blank">swagger.yaml</a> exists</li>
+              <li>Clear browser cache (Ctrl+Shift+Del)</li>
+              <li>Try in Chrome/Firefox</li>
+            </ol>
+          </div>
+        `;
+      }
+    }
+
+    // Start loading when ready
+    document.addEventListener('DOMContentLoaded', loadSwagger);
+  </script>
+</body>
+</html>

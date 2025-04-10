@@ -1,0 +1,6 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /database_flora/swagger-ui/dist/
+  RewriteRule ^swagger.yaml$ - [L]
+  RewriteRule ^ index.html [L]
+</IfModule>
