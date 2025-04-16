@@ -64,13 +64,15 @@
 
 			input[type=text],
 			input[type=email],
-			input[type=number]
+			input[type=number],
+			select
 			{
-				padding: 0.4rem 1rem;
-  				margin: 0.5rem 0;
+				padding: 0.2rem 1rem;
+  				margin: 0.2rem 0;
   				box-sizing: border-box;
 				border: 1px solid black;
 				border-radius:0.25rem;
+				height:2.5rem;
 			}
 
 			.pagination a {
@@ -104,12 +106,14 @@
 text-decoration:underline;
 }
 
-.btn{
+.btn,
+.upload{
 background-color: white;
   color: black;
   border: 2px solid #04AA6D;
   transition-duration: 0.4s;
-  padding: 0.4rem 2rem;
+  padding: 0.4rem auto;
+  height:2.5rem;
 }
 
 .btn i{
@@ -118,8 +122,9 @@ background-color: white;
 
 .btn:not(.disabled-btn):hover,
 .btn:not(.disabled-btn):not([disabled]):hover,
-.btn:hover i{
-  background-color: #04AA6D;
+.btn:hover i,
+.upload:hover{
+  background-color: #04AA6D !important;
   color: white !important;
 }
 
@@ -129,7 +134,12 @@ background-color: white;
   cursor: not-allowed;
 }
 
-
+.hidden {
+    opacity: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+}
 
 
 

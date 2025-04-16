@@ -7,7 +7,208 @@ include('includes/header.php');
 
 data_entry_secure();
 
-// echo $_SESSION['email'];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST["import"])) {
+    $filename = $_FILES["file"]["tmp_name"];
+    
+    // Check if the file is a CSV file
+    if (pathinfo($_FILES["file"]["name"], PATHINFO_EXTENSION) != "csv") {
+        echo "<script>alert('Please upload a CSV file.');</script>";
+    } else {
+        // Proceed with importing
+        if (importCSV($filename, $connect)) {
+            echo "<script>alert('CSV file imported successfully!');</script>";
+        } else {
+            echo "<script>alert('Import failed.');</script>";
+        }
+    }
+}
+// import csv file
+if (isset($_POST["import"])) {
+    $filename = $_FILES["file"]["tmp_name"];
+    
+    // Check if the file is a CSV file
+    if (pathinfo($_FILES["file"]["name"], PATHINFO_EXTENSION) != "csv") {
+        echo "Please upload a CSV file.";
+        exit;
+    }
+    
+    // Proceed with importing the CSV file
+    importCSV($filename, $connect);
+}
+
+function importCSV($filename,$connect) {
+    
+    if (!file_exists($filename)) {
+        console.log("File not found");
+        return false;
+    }
+
+    $file = fopen($filename, "r");
+    if (!$file) {
+       console.log("Could not open file");
+        return false;
+    }
+
+    // Skip header
+    fgetcsv($file, 10000, ",");
+
+    while (($getData = fgetcsv($file, 10000, ",")) !== FALSE) {
+        if (count($getData) < 1) {
+            error_log("Skipping invalid row: " . implode(",", $getData));
+            continue;
+        }
+
+        // Process data (same as your code)
+        $id = $getData[0] ?? null;
+        $first_name = $getData[1] ?? '';
+        $last_name = $getData[2] ?? '';
+        $email = $getData[3] ?? '';
+        $gender = $getData[4] ?? null;
+        $salary = $getData[7] ?? null;
+        $position = $getData[8] ?? null;
+        $size = $getData[9] ?? null;
+        $comment = $getData[10] ?? null;
+
+        // Check if record exists
+        $checkSql = "SELECT id FROM employee_add WHERE id = ?";
+        $checkStmt = $connect->prepare($checkSql); 
+        $checkStmt->bind_param("i", $id);
+        
+        if (!$checkStmt->execute()) {
+            error_log("Check query failed: " . $checkStmt->error);
+            continue;
+        }
+
+        $result = $checkStmt->get_result();
+        $exists = $result->num_rows > 0;
+        $checkStmt->close();
+
+        // Prepare the appropriate query
+        if ($exists) {
+            $sql = "UPDATE employee_add SET 
+                    first_name = ?,
+                    last_name = ?,
+                    email = ?,
+                    gender = ?,
+                    updatedAt = NOW(),
+                    salary = ?,
+                    position = ?,
+                    size = ?,
+                    comment = ?
+                    WHERE id = ?";
+            $stmt = $connect->prepare($sql);
+            $stmt->bind_param("ssssdsssi", 
+                $first_name, 
+                $last_name, 
+                $email, 
+                $gender,
+                $salary,
+                $position,
+                $size,
+                $comment,
+                $id
+            );
+        } else {
+            $sql = "INSERT INTO employee_add (
+                    first_name, 
+                    last_name, 
+                    email, 
+                    gender, 
+                    createdAt, 
+                    salary, 
+                    position, 
+                    size, 
+                    comment,
+                    createdBy
+                ) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?)";
+            $stmt = $connect->prepare($sql);
+            $stmt->bind_param("ssssdssss", 
+                $first_name, 
+                $last_name, 
+                $email, 
+                $gender,
+                $salary,
+                $position,
+                $size,
+                $comment,
+                $_SESSION['role']
+            );
+        }
+
+        if (!$stmt->execute()) {
+            error_log("Execute failed: " . $stmt->error);
+        }
+        $stmt->close();
+    }
+
+    fclose($file);
+
+    return true;
+}
+
+// export data to csv, text, json
+if (isset($_POST['export_type'])) {
+    ob_end_clean();
+    
+    $query_download = "SELECT * FROM employee_add ORDER BY id ASC";
+    $result_download = mysqli_query($connect, $query_download);
+    
+    if ($result_download === false) {
+        die("Query failed: " . mysqli_error($connect));
+    }
+    
+    $data_download = [];
+    while ($row_download = mysqli_fetch_assoc($result_download)) {
+        $data_download[] = $row_download;
+    }
+    
+    switch ($_POST['export_type']) {
+        case 'csv':
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename=employees.csv');
+            $output_download = fopen('php://output', 'w');
+            
+            // Write headers
+            if (!empty($data_download)) {
+                fputcsv($output_download, array_keys($data_download[0]));
+            }
+            
+            // Write data
+            foreach ($data_download as $row_download) {
+                fputcsv($output_download, $row_download);
+            }
+            fclose($output_download);
+            break;
+            
+        case 'text':
+            header('Content-Type: text/plain; charset=utf-8');
+            header('Content-Disposition: attachment; filename=employees.txt');
+            
+            // Write headers
+            if (!empty($data_download)) {
+                echo implode("\t", array_keys($data_download[0])) . "\n";
+            }
+            
+            // Write data
+            foreach ($data_download as $row_download) {
+                echo implode("\t", $row_download) . "\n";
+            }
+            break;
+            
+        case 'json':
+            header('Content-Type: application/json; charset=utf-8');
+            header('Content-Disposition: attachment; filename=employees.json');
+            echo json_encode($data_download, JSON_PRETTY_PRINT);
+            break;
+    }
+    
+    exit;
+}
+
+
+
+// after creating employee, send it for approval
 
 if(isset($_POST['sendEmployee'])) {
     $id = $_POST['id'];
@@ -26,34 +227,77 @@ if(isset($_POST['sendEmployee'])) {
 
 
 
-
+// get drop-down list for gender
 $query_gender = 'SELECT * FROM `gender`'; 
 $genders = $connect->query($query_gender)->fetch_all(MYSQLI_ASSOC);
 
 ?>
 
 <div class="flex-grow">
+<div class="w-2/3 mx-auto">
     <h1 class="text-center text-2xl mb-4 title">Employee Data</h1>
-    <div class="w-2/3 mx-auto">
-    <form id="addEmployee" class="w-full text-center">
-        <input type="text" name="firstName" id="addFName" placeholder="firstName" >
-        <input type="text" name="lastName" id="addLName" placeholder="lastName" >
-        <input type="email" name="email" id="addEmail" placeholder="email" >
+    <div class="w-full flex justify-end">
+        <span id="fileName" class="text-sm text-gray-500 ml-2 truncate max-w-xs"></span>
+</div>
+        <div class="flex justify-between align-center">
 
-        <select name="gender" id="addGender" placeholder="gender" class="border p-2 rounded border-gray-600 text-gray-400">
-                        <option value="">Please select gender</option>
-                            <?php foreach ($genders as $gender): ?>
-                                <option value="<?php echo $gender['gender']; ?>">
-                                        <?php echo $gender['gender']; ?>
-                                </option>
-                            <?php endforeach; ?>
-        </select>
+                <form id="addEmployee" class="w-3/4 text-center flex align-end justify-center gap-1">
+                    <input type="text" name="firstName" id="addFName" placeholder="first name" class="w-1/6">
+                    <input type="text" name="lastName" id="addLName" placeholder="last name" class="w-1/6">
+                    <input type="email" name="email" id="addEmail" placeholder="email" class="w-2/6">
 
-        <!-- <input type="text" name="gender" id="addGender" placeholder="gender" > -->
-    <button type = "submit" class="btn rounded text-green-600">Add<i class="fa-solid fa-square-plus ms-3 text-green-600 hover:text-white"></i></button>
-    </form>
+                    <select name="gender" id="addGender" placeholder="gender" class="border p-2 rounded border-gray-600 text-gray-400 w-1/6 self-center">
+                                    <option value="">Select gender</option>
+                                        <?php foreach ($genders as $gender): ?>
+                                            <option value="<?php echo $gender['gender']; ?>">
+                                                    <?php echo $gender['gender']; ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                    </select>
 
-<p class="text-center mt-5 text-gray-400 italic">Click the cell to edit.</p>
+                    <!-- <input type="text" name="gender" id="addGender" placeholder="gender" > -->
+                <button type = "submit" class="btn rounded text-green-600 w-1/6 self-center">Add<i class="fa-solid fa-square-plus ms-3 text-green-600 hover:text-white"></i></button>
+                </form>
+                <form action="add_salary.php" method="post" enctype="multipart/form-data" class="w-1/4 flex justify-end items-center gap-2">
+                    <div class="relative">
+                        <input type="file" name="file" id="csvUpload" accept=".csv" class="opacity-0 absolute w-full h-full" onchange="showFileName()">
+                        <button type="button" class="upload btn rounded text-green-600 self-center p-2">
+                            Choose CSV File
+                        </button>
+                    </div>
+                    <button type="submit" name="import" class="btn rounded text-green-600 p-2">Upload
+                        <i class="fa-solid fa-upload ms-1 text-green-600 hover:text-white"></i>
+                    </button>
+                </form>
+            </div>
+
+    <div class="flex align-center justify-between mt-5">
+        <div class="w-1/3"></div>
+        <div class="w-1/3"><p class="text-center text-gray-400 italic">Click the cell to edit.</p></div>
+        <div class="w-1/3 text-end flex flex-row gap-5 justify-end text-gray-400">
+
+            <form method="post" class="inline-form">
+                <input type="hidden" name="export_type" value="csv">
+                <button type="submit" class="export-btn hover:text-green-600">
+                    <i class="fas fa-file-csv"></i> CSV
+                </button>
+            </form>
+            
+            <form method="post" class="inline-form">
+                <input type="hidden" name="export_type" value="text">
+                <button type="submit" class="export-btn hover:text-green-600">
+                    <i class="fas fa-file-alt"></i> Text
+                </button>
+            </form>
+            
+            <form method="post" class="inline-form">
+                <input type="hidden" name="export_type" value="json">
+                <button type="submit" class="export-btn hover:text-green-600">
+                    <i class="fas fa-file-code"></i> JSON
+                </button>
+            </form>
+        </div>
+    </div>
     <table id="employeeTable" class="w-full">
         <thead>
             <tr>
@@ -120,11 +364,6 @@ $genders = $connect->query($query_gender)->fetch_all(MYSQLI_ASSOC);
                 </td>
                         
                     `;
-
-                    // <td><span class="editable" id="edit_${employee.id}_salary">none</span></td>
-                    //     <td><span class="editable" id="edit_${employee.id}_position">none</span></td>
-                    //     <td><span class="editable" id="edit_${employee.id}_size">none</span></td>
-                    // <button id="dataEntryEdit_${employee.id}" onclick="editEmployee(${employee.id})" class="btn rounded">Edit</button>
                     tableBody.appendChild(row);
                 });
 
@@ -322,9 +561,9 @@ $genders = $connect->query($query_gender)->fetch_all(MYSQLI_ASSOC);
                     console.groupEnd();
                 });
             });
-        }
-    });
-});
+            }
+            });
+        });
 
 
         })
@@ -367,8 +606,8 @@ $genders = $connect->query($query_gender)->fetch_all(MYSQLI_ASSOC);
     .catch(error => {
         console.error('Error:', error);
         alert('An error occurred');
+        });
     });
-});
 
 // Function to load employees (reuse your existing fetch code)
 function loadEmployees() {
@@ -398,36 +637,20 @@ function delEmployee(id) {
     .catch(error => console.error('Error:', error));}
 }
 
-// function editEmployee(id) {
-//     console.log("call edit");
+
+
+function showFileName() {
+    const fileInput = document.getElementById('csvUpload');
+    const fileNameDisplay = document.getElementById('fileName');
     
-//     const formData = {
-//         first_name: document.getElementById(`edit_${id}_first_name`).innerText,
-//         last_name: document.getElementById(`edit_${id}_last_name`).innerText,
-//         email: document.getElementById(`edit_${id}_email`).innerText,
-//         gender: document.getElementById(`edit_${id}_gender`).innerText
-//     };
-
-//     console.log('Form data:', formData);
-
-//     fetch(`http://localhost/database_flora/api/employee.php?id=${id}`, {
-//         method: 'PUT',
-//         headers: {
-//             'Content-Type': 'application/json',
-//         }, 
-//         body: JSON.stringify(formData)     
-//     }).then(response => response.json())
-//     .then(data => {   
-//         if (!data.error) {
-//             window.location.href = 'add_salary.php';
-//         } else {
-//             alert(data.message);
-//         }
-//     })
-//     .catch(error => console.error('Error:', error));
-// }
-
-
+    if (fileInput.files.length > 0) {
+        fileNameDisplay.textContent = "Selected: " + fileInput.files[0].name;
+        fileNameDisplay.classList.remove('hidden');
+    } else {
+        fileNameDisplay.textContent = '';
+        fileNameDisplay.classList.add('hidden');
+    }
+}
 
 
 
